@@ -57,36 +57,35 @@
 
 <script>
 let correctAnswer = "";
-let acceptedForms = [];
+let currentType = "";
 
 function toSurd(n) {
   const root = Math.sqrt(n);
   if (Number.isInteger(root)) {
-    return root.toString();
+    return root.toString(); // simplify perfect squares
   }
   return `√(${n})`;
 }
 
 function generateQuestion() {
-  const a = Math.floor(Math.random() * 6) + 3; // opposite
-  const b = Math.floor(Math.random() * 6) + 4; // adjacent
-  const hypSquared = a*a + b*b;
-  const c = toSurd(hypSquared);
+  const a = Math.floor(Math.random() * 6) + 3;
+  const b = Math.floor(Math.random() * 6) + 4;
+  const c = toSurd(a*a + b*b);
 
   drawTriangle(a, b, c);
 
-  document.getElementById("question").textContent =
-    `Find θ using trig ratios.`;
+  const questionTypes = ["findAngle", "findSide"];
+  currentType = questionTypes[Math.floor(Math.random() * questionTypes.length)];
 
-  // correct forms: tan⁻¹, sin⁻¹, cos⁻¹ and ratios
-  acceptedForms = [
-    `tan⁻¹(${a}/${b})`,
-    `sin⁻¹(${a}/${c})`,
-    `cos⁻¹(${b}/${c})`,
-    `${a}/${c}`,  // sin θ
-    `${b}/${c}`,  // cos θ
-    `${a}/${b}`   // tan θ
-  ];
+  if (currentType === "findAngle") {
+    document.getElementById("question").textContent =
+      `Find θ using inverse trig (side lengths given).`;
+    correctAnswer = `tan⁻¹(${a}/${b})`;
+  } else {
+    document.getElementById("question").textContent =
+      `Find the hypotenuse length in simplest form.`;
+    correctAnswer = c;
+  }
 }
 
 function drawTriangle(a, b, c) {
@@ -95,16 +94,17 @@ function drawTriangle(a, b, c) {
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   ctx.beginPath();
-  ctx.moveTo(50,250);        // left bottom
-  ctx.lineTo(250,250);       // right bottom
-  ctx.lineTo(250,50);        // right top
+  ctx.moveTo(50,250);
+  ctx.lineTo(250,250);
+  ctx.lineTo(250,50);
   ctx.closePath();
   ctx.stroke();
 
   ctx.font = "16px Arial";
-  ctx.fillText(`Opp = ${a}`, 260, 150);
-  ctx.fillText(`Adj = ${b}`, 150, 270);
-  ctx.fillText(`Hyp = ${c}`, 140, 130);
+  ctx.fillText(a, 250, 150);
+  ctx.fillText(b, 150, 250);
+  ctx.fillText(c, 150, 140);
+
   ctx.fillText("θ", 45, 245);
 }
 
@@ -112,49 +112,47 @@ function normalizeInput(input) {
   let ans = input.trim().toLowerCase();
   ans = ans.replace(/\s+/g, "");
 
+  // superscript minus handling
   ans = ans.replace(/⁻¹/g, "^-1");
+
+  // trig synonyms
   ans = ans.replace(/atan|arctan|inversetan/g, "tan^-1");
   ans = ans.replace(/asin|arcsin|inversesin/g, "sin^-1");
   ans = ans.replace(/acos|arccos|inversecos/g, "cos^-1");
 
+  // sqrt handling
   ans = ans.replace(/√\(?([0-9]+)\)?/g, "Math.sqrt($1)");
 
   return ans;
 }
 
 function checkAnswer() {
-  const userInput = document.getElementById("answer").value.trim();
+  const userInput = document.getElementById("answer").value;
   const feedback = document.getElementById("feedback");
 
-  if (!userInput) {
-    feedback.textContent = "⚠️ Please enter an answer.";
-    feedback.style.color = "orange";
-    return;
-  }
+  let user = normalizeInput(userInput);
+  let correct = normalizeInput(correctAnswer);
 
-  // normalize both user input and accepted answers
-  const userNorm = normalizeInput(userInput);
-
-  for (let form of acceptedForms) {
-    const formNorm = normalizeInput(form);
-    try {
-      if (userNorm === formNorm) {
-        feedback.textContent = "✅ Correct!";
-        feedback.style.color = "green";
-        return;
-      }
-      const userVal = eval(userNorm);
-      const correctVal = eval(formNorm);
+  try {
+    if (user === correct) {
+      feedback.textContent = "✅ Correct!";
+      feedback.style.color = "green";
+    } else {
+      // try numeric comparison
+      const userVal = eval(user);
+      const correctVal = eval(correct);
       if (Math.abs(userVal - correctVal) < 0.01) {
-        feedback.textContent = "✅ Correct!";
+        feedback.textContent = "✅ Correct (numeric match)!";
         feedback.style.color = "green";
-        return;
+      } else {
+        feedback.textContent = `❌ Wrong. Correct: ${correctAnswer}`;
+        feedback.style.color = "red";
       }
-    } catch {}
+    }
+  } catch {
+    feedback.textContent = `❌ Wrong. Correct: ${correctAnswer}`;
+    feedback.style.color = "red";
   }
-
-  feedback.textContent = `❌ Wrong. Acceptable answers: ${acceptedForms.join(" or ")}`;
-  feedback.style.color = "red";
 }
 
 function nextQuestion() {
@@ -169,11 +167,13 @@ document.querySelectorAll('.symbol').forEach(el => {
     e.dataTransfer.setData("text", e.target.textContent);
   });
 });
+
 document.getElementById("answer").addEventListener("dragover", e => e.preventDefault());
 document.getElementById("answer").addEventListener("drop", e => {
   e.preventDefault();
   const text = e.dataTransfer.getData("text");
-  document.getElementById("answer").value += text;
+  const input = document.getElementById("answer");
+  input.value += text;
 });
 
 // ENTER = submit
@@ -181,7 +181,7 @@ document.getElementById("answer").addEventListener("keydown", e => {
   if (e.key === "Enter") checkAnswer();
 });
 
-// start
+// start game
 generateQuestion();
 </script>
 
