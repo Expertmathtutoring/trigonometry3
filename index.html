@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📐 Missing Angle Trig Game</title>
+<style>
+body { 
+  font-family: 'Comic Sans MS', cursive, sans-serif; 
+  margin: 0; padding: 0; 
+  background: linear-gradient(135deg, #f0f9ff, #cbebff); 
+  text-align: center; 
+}
+h1 { 
+  background: #4caf50; 
+  color: white; 
+  padding: 15px; 
+  margin: 0; 
+}
+#game-container { 
+  margin: 20px auto; 
+  width: 90%; 
+  max-width: 650px; 
+  background: white; 
+  padding: 20px; 
+  border-radius: 15px; 
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+}
+canvas { 
+  border: 2px solid #333; 
+  border-radius: 10px; 
+  margin-bottom: 15px; 
+  background: #fafafa; 
+}
+input { 
+  padding: 10px; 
+  margin: 5px; 
+  font-size: 16px; 
+  border-radius: 8px; 
+  border: 1px solid #ccc; 
+  width: 250px; 
+}
+button { 
+  padding: 10px; 
+  margin: 5px; 
+  font-size: 16px; 
+  border-radius: 8px; 
+  border: 1px solid #ccc; 
+  background: #4caf50; 
+  color: white; 
+  cursor: pointer; 
+}
+button:hover { background: #388e3c; }
+#feedback { font-size: 18px; margin-top: 10px; font-weight: bold; }
+#tabs { margin: 10px 0; }
+.tab { 
+  display: inline-block; 
+  padding: 8px 12px; 
+  background: #e8f5e9; 
+  border: 1px solid #a5d6a7; 
+  border-radius: 6px; 
+  margin: 3px; 
+  cursor: pointer; 
+  user-select: none; 
+}
+
+/* Hint Panel */
+#hint-panel {
+  position: fixed;
+  right: -260px;
+  top: 0;
+  height: 100%;
+  width: 260px;
+  background: #e8f5e9;
+  box-shadow: -3px 0 8px rgba(0,0,0,0.2);
+  padding: 20px;
+  text-align: left;
+  transition: right 0.3s ease-in-out;
+  z-index: 1000;
+}
+#hint-panel.open { right: 0; }
+#hint-btn {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: #4caf50;
+  color: white;
+  padding: 12px;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  font-weight: bold;
+  z-index: 1001;
+}
+#hint-panel h2 {
+  margin-top: 0;
+  font-size: 20px;
+  color: #2e7d32;
+}
+#hint-panel ul {
+  padding-left: 20px;
+  list-style: none;
+}
+#hint-panel li {
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+</style>
+</head>
+<body>
+<h1>📐 Find the Missing Angle</h1>
+<div id="game-container">
+  <canvas id="gameCanvas"></canvas>
+  <div id="tabs">
+    <div class="tab">sin⁻¹(</div>
+    <div class="tab">cos⁻¹(</div>
+    <div class="tab">tan⁻¹(</div>
+    <div class="tab">√(</div>
+    <div class="tab">/</div>
+    <div class="tab">*</div>
+    <div class="tab">+</div>
+    <div class="tab">-</div>
+    <div class="tab">(</div>
+    <div class="tab">)</div>
+  </div>
+  <div>
+    <label for="answer">Your Answer:</label>
+    <input type="text" id="answer" placeholder="Enter angle in degrees or expression">
+    <button id="submitBtn">Submit</button>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+  <div id="feedback"></div>
+</div>
+
+<!-- Hint Button and Panel -->
+<div id="hint-btn">Hint ➡</div>
+<div id="hint-panel">
+  <h2>📘 Trig Ratios</h2>
+  <ul>
+    <li><b>sin θ</b> = opposite / hypotenuse</li>
+    <li><b>cos θ</b> = adjacent / hypotenuse</li>
+    <li><b>tan θ</b> = opposite / adjacent</li>
+  </ul>
+  <p><b>To find θ:</b></p>
+  <ul>
+    <li>θ = sin⁻¹(opposite / hypotenuse)</li>
+    <li>θ = cos⁻¹(adjacent / hypotenuse)</li>
+    <li>θ = tan⁻¹(opposite / adjacent)</li>
+  </ul>
+</div>
+
+<audio id="applause" src="https://www.soundjay.com/human/applause-01.mp3" preload="auto"></audio>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = 600;
+canvas.height = 300;
+
+let correctAnswer = 0;
+let validExprs = [];
+let currentTriangle = {};
+const answerInput = document.getElementById('answer');
+
+// Toggle hint panel
+document.getElementById("hint-btn").addEventListener("click", () => {
+  document.getElementById("hint-panel").classList.toggle("open");
+});
+
+// Tab click
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => answerInput.value += tab.textContent);
+});
+
+// --- Normalize user input ---
+function normalizeInput(expr) {
+  let ans = expr.trim();
+  ans = ans.replace(/⁻¹/g, "^-1");
+  ans = ans.replace(/√\(?([0-9]+)\)?/g, "Math.sqrt($1)");
+  ans = ans.replace(/sin\^-1\(([^)]+)\)/gi, "Math.asin($1)*180/Math.PI");
+  ans = ans.replace(/cos\^-1\(([^)]+)\)/gi, "Math.acos($1)*180/Math.PI");
+  ans = ans.replace(/tan\^-1\(([^)]+)\)/gi, "Math.atan($1)*180/Math.PI");
+  return ans;
+}
+function safeEval(expr) {
+  try { return eval(normalizeInput(expr)); } 
+  catch { return NaN; }
+}
+function toSurd(n) {
+  let sqrt = Math.sqrt(n);
+  return Number.isInteger(sqrt) ? `${sqrt}` : `√(${n})`;
+}
+
+// Draw triangle
+function drawTriangle() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const angle = Math.floor(Math.random()*41)+25; 
+  const adj = Math.floor(Math.random()*5)+3;
+  const opp = Math.round(Math.tan(angle*Math.PI/180)*adj);
+  const hyp2 = adj*adj + opp*opp;
+  const hyp = Math.sqrt(hyp2);
+
+  currentTriangle = {opp, adj, hyp};
+  correctAnswer = angle;
+
+  // Generate all valid expressions
+  validExprs = [
+    `tan⁻¹(${opp}/${adj})`,
+    `sin⁻¹(${opp}/√(${hyp2}))`,
+    `cos⁻¹(${adj}/√(${hyp2}))`
+  ];
+
+  const scale=Math.min((canvas.width-100)/adj,(canvas.height-80)/opp);
+  const x=100,y=250;
+
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x+adj*scale,y);
+  ctx.lineTo(x,y-opp*scale);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle="#c8e6c9";
+  ctx.fill();
+
+  ctx.fillStyle="black";
+  ctx.font="14px Arial";
+  ctx.fillText(`Opp = ${opp}`, x-70, y-10);
+  ctx.fillText(`Adj = ${adj}`, x+adj*scale/2, y+15);
+  ctx.fillText(`Hyp = ${toSurd(hyp2)}`, x+adj*scale/2, y-opp*scale/2);
+
+  document.getElementById("feedback").style.color="black";
+  document.getElementById("feedback").textContent="🎯 Find the angle θ";
+}
+
+// Check answer
+function checkAnswer() {
+  const input = answerInput.value.trim();
+  const feedback = document.getElementById("feedback");
+
+  const numericVal = safeEval(input);
+
+  // Numeric acceptance
+  if (!isNaN(numericVal) && Math.abs(numericVal - correctAnswer) <= 1) {
+    feedback.style.color="green";
+    feedback.textContent=`✅ Correct! θ ≈ ${correctAnswer}° 🎉`;
+    playApplause();
+    setTimeout(restartGame,3000);
+    return;
+  }
+
+  // Expression acceptance (any trig form)
+  const cleanInput = input.replace(/\s+/g,"");
+  for (let expr of validExprs) {
+    if (cleanInput === expr.replace(/\s+/g,"")) {
+      feedback.style.color="green";
+      feedback.textContent=`✅ Correct Expression! θ = ${expr}`;
+      playApplause();
+      setTimeout(restartGame,3000);
+      return;
+    }
+  }
+
+  feedback.style.color="red";
+  feedback.textContent=`❌ Oops! Correct θ ≈ ${correctAnswer}° or ${validExprs.join(" , ")}`;
+}
+
+// Restart
+function restartGame(){ answerInput.value=""; drawTriangle(); }
+function playApplause(){ const a=document.getElementById("applause"); a.currentTime=0; a.play(); }
+
+// Enable Enter
+answerInput.addEventListener("keydown", e=>{
+  if(e.key==="Enter"){ e.preventDefault(); checkAnswer(); }
+});
+document.getElementById("submitBtn").addEventListener("click", checkAnswer);
+
+// Start
+drawTriangle();
+</script>
+</body>
+</html>
