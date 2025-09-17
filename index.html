@@ -3,190 +3,212 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎯 Trigonometry Game</title>
+<title>🎯 Find the Angle Game</title>
 <style>
-  body {
-    font-family: 'Comic Sans MS', cursive, sans-serif;
-    background: linear-gradient(135deg, #c2e9fb, #a1c4fd);
-    text-align: center;
-    padding: 20px;
-  }
-  #game-container {
-    background: white;
-    border-radius: 20px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    max-width: 600px;
-    margin: auto;
-  }
-  canvas { background: #f9f9f9; margin: 20px auto; display: block; border: 2px solid #333; }
-  input { padding: 10px; width: 80%; margin: 10px 0; font-size: 1em; }
-  button { padding: 10px 20px; margin: 10px; border: none; border-radius: 10px; background: #4caf50; color: white; cursor: pointer; font-size: 1em; }
-  button:hover { background: #45a049; }
-  .symbols { margin: 15px 0; }
-  .symbol {
-    display: inline-block;
-    background: #eee;
-    padding: 8px 12px;
-    margin: 5px;
-    border-radius: 8px;
-    cursor: grab;
-    font-size: 1.2em;
-    user-select: none;
-  }
+body {
+  font-family: 'Comic Sans MS', cursive, sans-serif;
+  margin: 0; padding: 0; overflow-x: hidden;
+}
+#animated-bg, #fireworksCanvas {
+  position: fixed; top:0; left:0; width:100%; height:100%; z-index:0;
+}
+#fireworksCanvas { pointer-events:none; z-index:1; }
+#game-container {
+  background:white; border-radius:20px; padding:20px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.2); max-width:700px;
+  margin:50px auto; position:relative; z-index:2; text-align:center;
+}
+canvas#triangleCanvas {
+  background:#f9f9f9; margin:20px auto; display:block; border:2px solid #333;
+}
+input { padding:10px; width:90%; margin:10px 0; font-size:1em; }
+button {
+  padding:10px 20px; margin:10px; border:none; border-radius:10px;
+  background:#4caf50; color:white; cursor:pointer; font-size:1em;
+}
+button:hover { background:#45a049; }
+.symbols { margin:15px 0; }
+.symbol {
+  display:inline-block; background:#eee; padding:8px 12px; margin:5px;
+  border-radius:8px; cursor:pointer; font-size:1.2em; user-select:none;
+}
 </style>
 </head>
 <body>
 
+<canvas id="animated-bg"></canvas>
+<canvas id="fireworksCanvas"></canvas>
+
 <div id="game-container">
-  <h2>🎯 Trigonometry Practice</h2>
+  <h2>🎯 Find the Angle (θ)</h2>
   <canvas id="triangleCanvas" width="300" height="300"></canvas>
   <p id="question"></p>
+
   <div class="symbols">
-    <div class="symbol" draggable="true">sin⁻¹</div>
-    <div class="symbol" draggable="true">cos⁻¹</div>
-    <div class="symbol" draggable="true">tan⁻¹</div>
-    <div class="symbol" draggable="true">√</div>
+    <div class="symbol">sin⁻¹</div>
+    <div class="symbol">cos⁻¹</div>
+    <div class="symbol">tan⁻¹</div>
+    <div class="symbol">√</div>
+    <div class="symbol">√( )</div>
+    <div class="symbol">²</div>
+    <div class="symbol">(</div>
+    <div class="symbol">)</div>
+    <div class="symbol">/</div>
   </div>
-  <input type="text" id="answer" placeholder="Type or drag symbols here">
+
+  <input type="text" id="answer" placeholder="Type or drag/click symbols here">
   <br>
   <button onclick="checkAnswer()">Submit</button>
   <button onclick="nextQuestion()">Next</button>
   <p id="feedback"></p>
 </div>
 
+<audio id="applause" src="https://www.soundjay.com/human/applause-8.mp3"></audio>
+
 <script>
-let correctAnswer = "";
-let currentType = "";
-
-function toSurd(n) {
-  const root = Math.sqrt(n);
-  if (Number.isInteger(root)) {
-    return root.toString(); // simplify perfect squares
-  }
-  return `√(${n})`;
+// ---------------- Animated Gradient Background ----------------
+const bgCanvas = document.getElementById("animated-bg");
+const bgCtx = bgCanvas.getContext("2d");
+bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+let hue = 200;
+function animateBg() {
+  hue += 0.3;
+  const gradient = bgCtx.createLinearGradient(0,0,bgCanvas.width,bgCanvas.height);
+  gradient.addColorStop(0, `hsl(${hue % 360},70%,70%)`);
+  gradient.addColorStop(1, `hsl(${(hue+60) % 360},70%,70%)`);
+  bgCtx.fillStyle = gradient;
+  bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
+  requestAnimationFrame(animateBg);
 }
+animateBg();
 
-function generateQuestion() {
-  const a = Math.floor(Math.random() * 6) + 3;
-  const b = Math.floor(Math.random() * 6) + 4;
-  const c = toSurd(a*a + b*b);
-
-  drawTriangle(a, b, c);
-
-  const questionTypes = ["findAngle", "findSide"];
-  currentType = questionTypes[Math.floor(Math.random() * questionTypes.length)];
-
-  if (currentType === "findAngle") {
-    document.getElementById("question").textContent =
-      `Find θ using inverse trig (side lengths given).`;
-    correctAnswer = `tan⁻¹(${a}/${b})`;
-  } else {
-    document.getElementById("question").textContent =
-      `Find the hypotenuse length in simplest form.`;
-    correctAnswer = c;
+// ---------------- Fireworks ----------------
+let fwCanvas=document.getElementById("fireworksCanvas"), fwCtx=fwCanvas.getContext("2d");
+fwCanvas.width=window.innerWidth; fwCanvas.height=window.innerHeight;
+let fireworks=[];
+function random(min,max){return Math.random()*(max-min)+min;}
+function createFirework(x,y){
+  const colors=["#ff2d2d","#ffcc00","#33cc33","#3399ff","#ff66cc"];
+  for(let i=0;i<40;i++){
+    fireworks.push({x,y,angle:random(0,Math.PI*2),speed:random(2,6),radius:2,alpha:1,color:colors[Math.floor(random(0,colors.length))]});
   }
 }
+function updateFireworks(){
+  fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);
+  fireworks.forEach((p,i)=>{
+    p.x+=Math.cos(p.angle)*p.speed;
+    p.y+=Math.sin(p.angle)*p.speed;
+    p.alpha-=0.02;
+    if(p.alpha<=0) fireworks.splice(i,1);
+    fwCtx.globalAlpha=p.alpha;
+    fwCtx.fillStyle=p.color;
+    fwCtx.beginPath();
+    fwCtx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+    fwCtx.fill();
+  });
+  fwCtx.globalAlpha=1;
+  requestAnimationFrame(updateFireworks);
+}
+updateFireworks();
 
-function drawTriangle(a, b, c) {
-  const canvas = document.getElementById("triangleCanvas");
-  const ctx = canvas.getContext("2d");
+// ---------------- Triangle Question ----------------
+let a,b,cVal,correctOptions=[];
+function toSurd(n){return Number.isInteger(Math.sqrt(n))?Math.sqrt(n):`√${n}`;}
+function generateQuestion(){
+  a=Math.floor(Math.random()*6)+3;
+  b=Math.floor(Math.random()*6)+4;
+  cVal=Math.sqrt(a*a+b*b);
+  drawTriangle(a,b,toSurd(a*a+b*b));
+  document.getElementById("question").textContent="Find θ using an inverse trig ratio.";
+  correctOptions=[Math.atan2(a,b), Math.asin(a/cVal), Math.acos(b/cVal)];
+}
+function drawTriangle(a,b,c){
+  const canvas=document.getElementById("triangleCanvas"),ctx=canvas.getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
   ctx.beginPath();
-  ctx.moveTo(50,250);
-  ctx.lineTo(250,250);
-  ctx.lineTo(250,50);
-  ctx.closePath();
-  ctx.stroke();
-
-  ctx.font = "16px Arial";
-  ctx.fillText(a, 250, 150);
-  ctx.fillText(b, 150, 250);
-  ctx.fillText(c, 150, 140);
-
-  ctx.fillText("θ", 45, 245);
+  ctx.moveTo(50,250); ctx.lineTo(250,250); ctx.lineTo(250,50); ctx.closePath(); ctx.stroke();
+  ctx.font="16px Arial";
+  ctx.fillText(a,250,150); ctx.fillText(b,150,250); ctx.fillText(c,150,140); ctx.fillText("θ",45,245);
 }
 
-function normalizeInput(input) {
-  let ans = input.trim().toLowerCase();
-  ans = ans.replace(/\s+/g, "");
-
-  // superscript minus handling
-  ans = ans.replace(/⁻¹/g, "^-1");
-
-  // trig synonyms
-  ans = ans.replace(/atan|arctan|inversetan/g, "tan^-1");
-  ans = ans.replace(/asin|arcsin|inversesin/g, "sin^-1");
-  ans = ans.replace(/acos|arccos|inversecos/g, "cos^-1");
-
-  // sqrt handling
-  ans = ans.replace(/√\(?([0-9]+)\)?/g, "Math.sqrt($1)");
-
+// ---------------- Input Handling ----------------
+function normalizeInput(input){
+  let ans=input.trim();
+  ans=ans.replace(/\s+/g,"");
+  ans=ans.replace(/⁻¹/g,"^-1").replace(/²/g,"^2");
+  ans=ans.replace(/√\(?([0-9]+)\)?/g,"Math.sqrt($1)");
+  ans=ans.replace(/atan|arctan|inversetan/gi,"Math.atan");
+  ans=ans.replace(/asin|arcsin|inversesin/gi,"Math.asin");
+  ans=ans.replace(/acos|arccos|inversecos/gi,"Math.acos");
+  ans=ans.replace(/tan\^-1/gi,"Math.atan");
+  ans=ans.replace(/sin\^-1/gi,"Math.asin");
+  ans=ans.replace(/cos\^-1/gi,"Math.acos");
   return ans;
 }
+function areParenthesesBalanced(str){let stack=[]; for(let ch of str){if(ch==="(")stack.push("("); else if(ch===")"){if(stack.length===0)return false; stack.pop();}} return stack.length===0;}
 
-function checkAnswer() {
-  const userInput = document.getElementById("answer").value;
-  const feedback = document.getElementById("feedback");
-
-  let user = normalizeInput(userInput);
-  let correct = normalizeInput(correctAnswer);
-
-  try {
-    if (user === correct) {
-      feedback.textContent = "✅ Correct!";
-      feedback.style.color = "green";
-    } else {
-      // try numeric comparison
-      const userVal = eval(user);
-      const correctVal = eval(correct);
-      if (Math.abs(userVal - correctVal) < 0.01) {
-        feedback.textContent = "✅ Correct (numeric match)!";
-        feedback.style.color = "green";
-      } else {
-        feedback.textContent = `❌ Wrong. Correct: ${correctAnswer}`;
-        feedback.style.color = "red";
+// ---------------- Check Answer ----------------
+function checkAnswer(){
+  const userInput=document.getElementById("answer").value;
+  const feedback=document.getElementById("feedback");
+  if(!areParenthesesBalanced(userInput)){
+    feedback.textContent="⚠️ Check your brackets — they don’t match.";
+    feedback.style.color="orange"; return;
+  }
+  let expr=normalizeInput(userInput);
+  try{
+    let userVal=eval(expr);
+    for(let val of correctOptions){
+      if(Math.abs(userVal-val)<0.01){
+        celebrate();
+        feedback.textContent="✅ Correct!";
+        feedback.style.color="green";
+        setTimeout(nextQuestion,2000); 
+        return;
       }
     }
-  } catch {
-    feedback.textContent = `❌ Wrong. Correct: ${correctAnswer}`;
-    feedback.style.color = "red";
-  }
+  }catch(err){}
+  feedback.textContent=`❌ Wrong. Example correct: tan⁻¹(${a}/${b}), sin⁻¹(${a}/√${a*a+b*b}), cos⁻¹(${b}/√${a*a+b*b})`;
+  feedback.style.color="red";
 }
 
-function nextQuestion() {
-  document.getElementById("answer").value = "";
-  document.getElementById("feedback").textContent = "";
+// ---------------- Celebrate ----------------
+function celebrate(){
+  createFirework(window.innerWidth/2,window.innerHeight/2);
+  document.getElementById("applause").play();
+}
+function nextQuestion(){
+  document.getElementById("answer").value="";
+  document.getElementById("feedback").textContent="";
   generateQuestion();
 }
 
-// drag symbols
-document.querySelectorAll('.symbol').forEach(el => {
-  el.addEventListener('dragstart', e => {
-    e.dataTransfer.setData("text", e.target.textContent);
-  });
+// ---------------- Symbol Click/Drag ----------------
+document.querySelectorAll('.symbol').forEach(el=>{
+  el.addEventListener('click',()=>{document.getElementById("answer").value+=el.textContent;});
+  el.addEventListener('dragstart',e=>{e.dataTransfer.setData("text",el.textContent);});
 });
-
-document.getElementById("answer").addEventListener("dragover", e => e.preventDefault());
-document.getElementById("answer").addEventListener("drop", e => {
+const answerInput=document.getElementById("answer");
+answerInput.addEventListener("dragover",e=>e.preventDefault());
+answerInput.addEventListener("drop",e=>{
   e.preventDefault();
-  const text = e.dataTransfer.getData("text");
-  const input = document.getElementById("answer");
-  input.value += text;
+  const text=e.dataTransfer.getData("text"); 
+  answerInput.value+=text;
 });
 
-// ENTER = submit
-document.getElementById("answer").addEventListener("keydown", e => {
-  if (e.key === "Enter") checkAnswer();
+// ---------------- ENTER key anywhere triggers submit ----------------
+document.addEventListener("keydown", e=>{
+  if(e.key==="Enter"){ e.preventDefault(); checkAnswer(); }
 });
 
-// start game
+// ---------------- Start ----------------
 generateQuestion();
 </script>
 
 </body>
 </html>
+
+
 
 
 
