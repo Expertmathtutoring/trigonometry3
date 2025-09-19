@@ -13,24 +13,41 @@ body {
   position: fixed; top:0; left:0; width:100%; height:100%; z-index:0;
 }
 #fireworksCanvas { pointer-events:none; z-index:1; }
+
 #game-container {
   background:white; border-radius:20px; padding:20px;
-  box-shadow:0 4px 15px rgba(0,0,0,0.2); max-width:700px;
-  margin:50px auto; position:relative; z-index:2; text-align:center;
+  box-shadow:0 4px 15px rgba(0,0,0,0.2); max-width:900px;
+  margin:50px auto; position:relative; display:flex;
 }
+
+#main-content { flex:2; text-align:center; position:relative; }
+#right-panel { flex:0 0 180px; margin-left:20px; text-align:center; }
+
 canvas#triangleCanvas {
   background:#f9f9f9; margin:20px auto; display:block; border:2px solid #333;
 }
+
 input { padding:10px; width:90%; margin:10px 0; font-size:1em; }
 button {
   padding:10px 20px; margin:10px; border:none; border-radius:10px;
   background:#4caf50; color:white; cursor:pointer; font-size:1em;
 }
 button:hover { background:#45a049; }
-.symbols { margin:15px 0; }
+
+.symbols { display:grid; grid-template-columns:1fr 1fr; gap:8px; justify-items:center; margin-top:10px; }
 .symbol {
-  display:inline-block; background:#eee; padding:8px 12px; margin:5px;
-  border-radius:8px; cursor:pointer; font-size:1.2em; user-select:none;
+  display:block; background:#eee; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:1.2em; width:70px; text-align:center;
+}
+
+/* Feedback animation */
+#feedback {
+  position:absolute; left:-200px; top:50%; transform:translateY(-50%);
+  font-size:24px; font-weight:bold; pointer-events:none; z-index:5;
+}
+@keyframes floatUp {
+  0% {opacity:0; transform:translateY(0) scale(1);}
+  10% {opacity:1;}
+  100% {opacity:translateY(-80px) scale(1.2); opacity:0;}
 }
 </style>
 </head>
@@ -40,27 +57,31 @@ button:hover { background:#45a049; }
 <canvas id="fireworksCanvas"></canvas>
 
 <div id="game-container">
-  <h2>🎯 Find the Angle (θ)</h2>
-  <canvas id="triangleCanvas" width="300" height="300"></canvas>
-  <p id="question"></p>
-
-  <div class="symbols">
-    <div class="symbol">sin⁻¹</div>
-    <div class="symbol">cos⁻¹</div>
-    <div class="symbol">tan⁻¹</div>
-    <div class="symbol">√</div>
-    <div class="symbol">√( )</div>
-    <div class="symbol">²</div>
-    <div class="symbol">(</div>
-    <div class="symbol">)</div>
-    <div class="symbol">/</div>
+  <div id="main-content">
+    <div id="feedback"></div>
+    <h2>🎯 Find the Angle (θ)</h2>
+    <canvas id="triangleCanvas" width="300" height="300"></canvas>
+    <p id="question"></p>
+    <input type="text" id="answer" placeholder="Type or drag/click symbols here">
+    <br>
+    <button onclick="checkAnswer()">Submit</button>
+    <button onclick="nextQuestion()">Next</button>
   </div>
 
-  <input type="text" id="answer" placeholder="Type or drag/click symbols here">
-  <br>
-  <button onclick="checkAnswer()">Submit</button>
-  <button onclick="nextQuestion()">Next</button>
-  <p id="feedback"></p>
+  <div id="right-panel">
+    <h3>Symbols</h3>
+    <div class="symbols">
+      <div class="symbol">sin⁻¹</div>
+      <div class="symbol">cos⁻¹</div>
+      <div class="symbol">tan⁻¹</div>
+      <div class="symbol">√</div>
+      <div class="symbol">√( )</div>
+      <div class="symbol">²</div>
+      <div class="symbol">(</div>
+      <div class="symbol">)</div>
+      <div class="symbol">/</div>
+    </div>
+  </div>
 </div>
 
 <audio id="applause" src="https://www.soundjay.com/human/applause-8.mp3"></audio>
@@ -152,8 +173,8 @@ function checkAnswer(){
   const userInput=document.getElementById("answer").value;
   const feedback=document.getElementById("feedback");
   if(!areParenthesesBalanced(userInput)){
-    feedback.textContent="⚠️ Check your brackets — they don’t match.";
-    feedback.style.color="orange"; return;
+    feedback.textContent="⚠️ Check your brackets!";
+    feedback.style.color="orange"; feedback.style.animation="floatUp 1.5s ease forwards"; return;
   }
   let expr=normalizeInput(userInput);
   try{
@@ -161,15 +182,15 @@ function checkAnswer(){
     for(let val of correctOptions){
       if(Math.abs(userVal-val)<0.01){
         celebrate();
-        feedback.textContent="✅ Correct!";
-        feedback.style.color="green";
+        feedback.textContent="✅ Correct! 🎉";
+        feedback.style.color="green"; feedback.style.animation="floatUp 1.5s ease forwards";
         setTimeout(nextQuestion,2000); 
         return;
       }
     }
   }catch(err){}
-  feedback.textContent=`❌ Wrong. Example correct: tan⁻¹(${a}/${b}), sin⁻¹(${a}/√${a*a+b*b}), cos⁻¹(${b}/√${a*a+b*b})`;
-  feedback.style.color="red";
+  feedback.textContent=`❌ Wrong 😅 Example: tan⁻¹(${a}/${b})`;
+  feedback.style.color="red"; feedback.style.animation="floatUp 1.5s ease forwards";
 }
 
 // ---------------- Celebrate ----------------
@@ -177,6 +198,7 @@ function celebrate(){
   createFirework(window.innerWidth/2,window.innerHeight/2);
   document.getElementById("applause").play();
 }
+
 function nextQuestion(){
   document.getElementById("answer").value="";
   document.getElementById("feedback").textContent="";
@@ -196,7 +218,7 @@ answerInput.addEventListener("drop",e=>{
   answerInput.value+=text;
 });
 
-// ---------------- ENTER key anywhere triggers submit ----------------
+// ---------------- ENTER key triggers submit ----------------
 document.addEventListener("keydown", e=>{
   if(e.key==="Enter"){ e.preventDefault(); checkAnswer(); }
 });
@@ -207,7 +229,6 @@ generateQuestion();
 
 </body>
 </html>
-
 
 
 
